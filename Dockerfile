@@ -21,7 +21,7 @@ WORKDIR /app
 COPY --from=app-builder /app/build ./build
 COPY --from=server-builder /app/triangle_travel .
 COPY --from=server-builder /app/seed .
-COPY db/schema.sql db/schema_auth.sql db/seed_data.sql ./db/
+COPY db/schema.sql db/seed_data.sql ./db/
 EXPOSE 8080
 RUN ./seed && rm ./seed
 ENV ENV=production

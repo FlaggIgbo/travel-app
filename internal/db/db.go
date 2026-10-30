@@ -2,170 +2,161 @@ package db
 
 import (
 	"database/sql"
-	"log"
 	"path/filepath"
 
 	_ "modernc.org/sqlite"
 )
 
-// DB wraps sql.DB for triangle travel data
+// DB wraps our SQLite database connection
 type DB struct {
 	*sql.DB
 }
 
-// New opens the SQLite database at dataDir/db/data.sqlite3
+// New opens a connection to the SQLite database
 func New(dataDir string) (*DB, error) {
-	path := filepath.Join(dataDir, "db", "data.sqlite3")
-	db, err := sql.Open("sqlite", path)
+	dbPath := filepath.Join(dataDir, "db", "data.sqlite3")
+	database, err := sql.Open("sqlite", dbPath)
 	if err != nil {
 		return nil, err
 	}
-	if err := db.Ping(); err != nil {
-		db.Close()
+
+	// Check if the connection works
+	err = database.Ping()
+	if err != nil {
+		database.Close()
 		return nil, err
 	}
-	return &DB{db}, nil
+
+	return &DB{database}, nil
 }
 
-// GetCityForAirport returns the city_code for an airport IATA code, or the code itself if not found
-func (d *DB) GetCityForAirport(airportCode string) (string, error) {
-	var city string
-	err := d.QueryRow("SELECT city_code FROM iata_cities WHERE airport_code = ? LIMIT 1", airportCode).Scan(&city)
+// GetCity returns the city code for an airport code
+func (d *DB) GetCity(airportCode string) (string, error) {
+	var cityCode string
+	query := "SELECT city_code FROM iata_cities WHERE airport_code = ? LIMIT 1"
+	err := d.QueryRow(query, airportCode).Scan(&cityCode)
 	if err == sql.ErrNoRows {
-		return airportCode, nil // treat airport as its own city
+		// If not found, use airport code itself
+		return airportCode, nil
 	}
 	if err != nil {
 		return "", err
 	}
-	return city, nil
+	return cityCode, nil
 }
 
-// SameCity returns true if both airport codes belong to the same city
-func (d *DB) SameCity(a, b string) (bool, error) {
-	if a == b {
+// SameCity checks if two airports are in the same city
+func (d *DB) SameCity(airport1, airport2 string) (bool, error) {
+	if airport1 == airport2 {
 		return true, nil
 	}
-	cityA, err := d.GetCityForAirport(a)
+
+	city1, err := d.GetCity(airport1)
 	if err != nil {
 		return false, err
 	}
-	cityB, err := d.GetCityForAirport(b)
+
+	city2, err := d.GetCity(airport2)
 	if err != nil {
 		return false, err
 	}
-	return cityA == cityB, nil
+
+	return city1 == city2, nil
 }
 
-// GetAirportsForCity returns airport IATA codes for a city code
+// GetAirportsForCity returns all airport codes in a city
 func (d *DB) GetAirportsForCity(cityCode string) ([]string, error) {
-	rows, err := d.Query("SELECT airport_code FROM iata_cities WHERE city_code = ? ORDER BY airport_code", cityCode)
+	query := "SELECT airport_code FROM iata_cities WHERE city_code = ? ORDER BY airport_code"
+	rows, err := d.Query(query, cityCode)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
+
 	var airports []string
 	for rows.Next() {
 		var code string
-		if err := rows.Scan(&code); err != nil {
-			log.Println(err)
-			continue
+		if err := rows.Scan(&code); err == nil {
+			airports = append(airports, code)
 		}
-		airports = append(airports, code)
 	}
+
+	// If no airports found, return cityCode itself
 	if len(airports) == 0 {
-		airports = []string{cityCode}
+		airports = append(airports, cityCode)
 	}
+
 	return airports, nil
 }
 
-// GetDistancesFrom returns map of to_iata -> distance_miles for an airport
-func (d *DB) GetDistancesFrom(fromIata string) (map[string]float64, error) {
-	rows, err := d.Query("SELECT to_iata, distance_miles FROM distances WHERE from_iata = ?", fromIata)
+// GetDistancesFrom returns a map of destination -> distance in miles
+func (d *DB) GetDistancesFrom(fromAirport string) (map[string]float64, error) {
+	query := "SELECT to_iata, distance_miles FROM distances WHERE from_iata = ?"
+	rows, err := d.Query(query, fromAirport)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	result := make(map[string]float64)
+
+	distances := make(map[string]float64)
 	for rows.Next() {
-		var to string
-		var dist float64
-		if err := rows.Scan(&to, &dist); err != nil {
-			log.Println(err)
-			continue
+		var toAirport string
+		var distance float64
+		if err := rows.Scan(&toAirport, &distance); err == nil {
+			distances[toAirport] = distance
 		}
-		result[to] = dist
 	}
-	return result, nil
+
+	return distances, nil
 }
 
-// GetRoutesFrom returns list of destination IATA codes for city+alliance
-func (d *DB) GetRoutesFrom(cityIata, alliance string) ([]string, error) {
-	rows, err := d.Query("SELECT route_to FROM city_routes WHERE city_iata = ? AND alliance = ? ORDER BY route_to", cityIata, alliance)
+// GetRoutesFrom returns reachable destinations for a city and alliance
+func (d *DB) GetRoutesFrom(cityOrAirport, alliance string) ([]string, error) {
+	query := "SELECT route_to FROM city_routes WHERE city_iata = ? AND alliance = ? ORDER BY route_to"
+	rows, err := d.Query(query, cityOrAirport, alliance)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
+
 	var routes []string
 	for rows.Next() {
-		var to string
-		if err := rows.Scan(&to); err != nil {
-			log.Println(err)
-			continue
+		var destination string
+		if err := rows.Scan(&destination); err == nil {
+			routes = append(routes, destination)
 		}
-		routes = append(routes, to)
 	}
+
 	return routes, nil
 }
 
-// GetRoutesFromWithFallback checks city first, then each airport in city
-func (d *DB) GetRoutesFromWithFallback(cityIata, alliance string) ([]string, error) {
-	routes, err := d.GetRoutesFrom(cityIata, alliance)
+// GetRoutesFromWithFallback checks city first, then each airport in that city
+func (d *DB) GetRoutesFromWithFallback(cityOrAirport, alliance string) ([]string, error) {
+	// Try direct lookup first
+	routes, err := d.GetRoutesFrom(cityOrAirport, alliance)
 	if err != nil || len(routes) > 0 {
 		return routes, err
 	}
-	airports, err := d.GetAirportsForCity(cityIata)
+
+	// Otherwise, find all airports in the city
+	airports, err := d.GetAirportsForCity(cityOrAirport)
 	if err != nil {
 		return nil, err
 	}
-	seen := make(map[string]bool)
-	for _, apt := range airports {
-		r, _ := d.GetRoutesFrom(apt, alliance)
-		for _, dest := range r {
-			if !seen[dest] {
-				seen[dest] = true
-				routes = append(routes, dest)
-			}
-		}
-	}
-	return routes, nil
-}
 
-// HasDirectRoute checks if there's a route from fromIata to any of toIatas for the alliance
-func (d *DB) HasDirectRoute(fromIata, alliance string, toIatas map[string]bool) map[string]bool {
-	result := make(map[string]bool)
-	for k := range toIatas {
-		result[k] = false
-	}
-	routes, err := d.GetRoutesFrom(fromIata, alliance)
-	if err != nil {
-		return result
-	}
-	for _, r := range routes {
-		if toIatas[r] {
-			result[r] = true
-		}
-	}
-	airports, _ := d.GetAirportsForCity(fromIata)
-	for _, apt := range airports {
-		if apt == fromIata {
-			continue
-		}
-		r, _ := d.GetRoutesFrom(apt, alliance)
-		for _, dest := range r {
-			if toIatas[dest] {
-				result[dest] = true
+	// Collect unique routes
+	seen := make(map[string]bool)
+	var allRoutes []string
+
+	for _, airport := range airports {
+		airportRoutes, _ := d.GetRoutesFrom(airport, alliance)
+		for _, destination := range airportRoutes {
+			if !seen[destination] {
+				seen[destination] = true
+				allRoutes = append(allRoutes, destination)
 			}
 		}
 	}
-	return result
+
+	return allRoutes, nil
 }
