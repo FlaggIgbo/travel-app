@@ -110,3 +110,12 @@ Run frontend type and lint checks:
 ```bash
 npm run check
 ```
+
+---
+
+## TODO
+
+- **Award Seat Availability Poller & Multi-Program Transfer Sniper**: A background daemon (similar to [Seats.aero](https://seats.aero/)) that monitors Oneworld / Star Alliance / SkyTeam saver award space across airline mileage programs and credit card transfer partners for routes like JFK → LHR and sends instant alerts when partner seats open.
+  - **Dynamic Polling & Token Bucket Rate Limiting**: Distributed rate-limiter (Redis token bucket) with rotating user-agent worker pools to query partner endpoints without IP bans.
+  - **Priority Queues (`Redis ZSET`)**: Score flight searches by departure proximity (e.g., polling every 15 mins for flights 3 weeks out vs. daily for 6 months out).
+  - **Transfer Valuation Calculator Engine**: In-memory graph of point currencies, transfer ratios, and baseline cash valuations (cents-per-point) to flag when transferring credit card points to airline miles beats booking with cash.
