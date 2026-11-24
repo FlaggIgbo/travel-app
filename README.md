@@ -158,3 +158,21 @@ Treat route graphs as an input layer and focus on **constraint satisfaction and 
 | *Fast Cloud Model (e.g. Haiku / Flash)* | 30 | `TODO` | `TODO` | `TODO` | `TODO` |
 | *Local Open-Weight (Ollama)* | 30 | `TODO` | `TODO` | `$0.00` | `TODO` |
 
+---
+
+## Performance & Bottlenecks
+
+Track throughput and latency bottlenecks identified and resolved via k6 load tests and profiling:
+
+- **Detailed Investigation Template & Log**: [`docs/PERFORMANCE.md`](./docs/PERFORMANCE.md)
+- **Architecture Decision Records**: [`docs/adr/`](./docs/adr/)
+- **Load & Chaos Harness**: [`load-tests/k6-test.js`](./load-tests/k6-test.js)
+
+### Bottleneck Log
+
+| Target Endpoint | Baseline (P95 / RPS) | Identified Bottleneck | Fix / Optimization | Post-Fix (P95 / RPS) | Status |
+|-----------------|----------------------|-----------------------|--------------------|----------------------|--------|
+| `POST /api/search` | *TODO: e.g. 420ms @ 50 RPS* | *TODO: e.g. Missing composite index on routes* | *TODO: Added index + LRU route cache* | *TODO: 38ms @ 400 RPS* | *Pending* |
+| `GET /api/cities` | *TODO* | *TODO* | *TODO* | *TODO* | *Pending* |
+
+
