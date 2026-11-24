@@ -12,6 +12,45 @@ type DB struct {
 	*sql.DB
 }
 
+// RouteRepository abstracts route graph and distance lookups so data ingestion
+// (cached SQLite, OpenFlights/airline timetable datasets, or live flight APIs)
+// is decoupled from core triangle optimization logic.
+//
+// TODO(step-1): Migrate internal/flights and internal/api to depend on RouteRepository
+// instead of concrete *db.DB, and add an external schedule/API adapter implementation.
+type RouteRepository interface {
+	GetCity(airportCode string) (string, error)
+	SameCity(airport1, airport2 string) (bool, error)
+	GetAirportsForCity(cityCode string) ([]string, error)
+	GetDistancesFrom(fromAirport string) (map[string]float64, error)
+	GetRoutesFrom(cityOrAirport, alliance string) ([]string, error)
+	GetRoutesFromWithFallback(cityOrAirport, alliance string) ([]string, error)
+	GetGroundBridgesFrom(fromAirport string, maxTransitMinutes int) ([]GroundBridge, error)
+	GetTransferPartners(currency string) ([]TransferPartnerRule, error)
+}
+
+// GroundBridge represents a regional rail or one-way car rental link between nearby airports.
+type GroundBridge struct {
+	FromIATA       string  `json:"fromIata"`
+	ToIATA         string  `json:"toIata"`
+	Mode           string  `json:"mode"` // e.g., "RAIL", "CAR_RENTAL", "BUS"
+	DistanceMiles  float64 `json:"distanceMiles"`
+	EstTransitMins int     `json:"estTransitMins"`
+	EstCashCostUSD float64 `json:"estCashCostUsd"`
+}
+
+// TransferPartnerRule encodes credit card or loyalty point transfer ratios and alliance mappings.
+type TransferPartnerRule struct {
+	SourceCurrency  string  `json:"sourceCurrency"`  // e.g., "CHASE_UR", "BILT", "AMEX_MR"
+	PartnerProgram  string  `json:"partnerProgram"`  // e.g., "AVIOS", "AADVANTAGE", "AEROPLAN"
+	Alliance        string  `json:"alliance"`        // e.g., "ONE_WORLD", "STAR_ALLIANCE", "SKY_TEAM"
+	TransferRatio   float64 `json:"transferRatio"`   // e.g., 1.0 for 1:1 transfers
+	BaselineCPP     float64 `json:"baselineCpp"`     // Baseline cents-per-point threshold
+}
+
+// Ensure *DB satisfies RouteRepository at compile time.
+var _ RouteRepository = (*DB)(nil)
+
 // New opens a connection to the SQLite database
 func New(dataDir string) (*DB, error) {
 	dbPath := filepath.Join(dataDir, "db", "data.sqlite3")
@@ -159,4 +198,19 @@ func (d *DB) GetRoutesFromWithFallback(cityOrAirport, alliance string) ([]string
 	}
 
 	return allRoutes, nil
+}
+
+// GetGroundBridgesFrom returns multi-modal ground transit links (regional rail, one-way car rental)
+// from an airport that unlock alternative departure hubs for open-jaw award redemptions.
+func (d *DB) GetGroundBridgesFrom(fromAirport string, maxTransitMinutes int) ([]GroundBridge, error) {
+	// TODO(multi-modal-bridging): Query ground_bridges table (or compute from distances + rail schedules)
+	// instead of relying solely on straight-line 55-300 mile radius checks.
+	return nil, nil
+}
+
+// GetTransferPartners returns loyalty transfer partner rules and alliance networks for a given point currency.
+func (d *DB) GetTransferPartners(currency string) ([]TransferPartnerRule, error) {
+	// TODO(loyalty-routing): Query loyalty_transfer_partners table to filter out low-value redemptions
+	// and match transfer currencies (Chase, Bilt, Avios, AAdvantage) with alliance direct routes.
+	return nil, nil
 }

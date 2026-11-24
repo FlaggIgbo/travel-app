@@ -81,3 +81,29 @@ func (a *API) Cities(c *gin.Context) {
 
 	c.JSON(http.StatusOK, cities)
 }
+
+// OptimizeRequest holds either a natural-language prompt or a structured TripRequest
+// for the agentic multi-city award and positioning optimizer.
+type OptimizeRequest struct {
+	Prompt      string               `json:"prompt"`
+	TripRequest *flights.TripRequest `json:"tripRequest,omitempty"`
+}
+
+// OptimizeItinerary handles POST /api/optimize
+//
+// TODO(step-2 & step-3): Wire this handler to internal/agent.Orchestrator.RunBoundedOptimization
+// (when Prompt is provided) or directly to internal/flights.EvaluateTriangleArbitrage
+// (when a structured TripRequest is provided).
+func (a *API) OptimizeItinerary(c *gin.Context) {
+	var req OptimizeRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid optimization request payload"})
+		return
+	}
+
+	c.JSON(http.StatusNotImplemented, gin.H{
+		"error":   "Agentic multi-city award & positioning optimizer is not yet wired up",
+		"todo":    "See internal/flights/optimizer.go and internal/agent/orchestrator.go",
+		"request": req,
+	})
+}

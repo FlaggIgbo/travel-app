@@ -40,6 +40,7 @@ func Run() {
 	apiHandler := &api.API{DB: database}
 	router.POST("/api/search", apiHandler.Search)
 	router.GET("/api/cities", apiHandler.Cities)
+	router.POST("/api/optimize", apiHandler.OptimizeItinerary) // TODO(step-3): Wire UI & MCP client to /api/optimize
 
 	// Serve static frontend files if built
 	buildFolder := filepath.Join(".", "build")

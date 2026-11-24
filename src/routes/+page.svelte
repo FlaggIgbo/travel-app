@@ -6,6 +6,10 @@
     avgPrice: number;
   }
 
+  // TODO(step-3-ui): Add structured TripRequest & CandidateItinerary interfaces for POST /api/optimize
+  // to support point balance inputs (Chase, Bilt, Avios, AAdvantage), positioning leg limits,
+  // natural-language intent prompt box, and a visual multi-city itinerary comparison view (CPP & trade-offs).
+
   // Form inputs
   let start = $state('JFK');
   let end = $state('SFO');

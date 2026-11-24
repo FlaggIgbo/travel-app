@@ -38,6 +38,9 @@ func FindTriangleTravel(database *db.DB, input SearchInput) (*SearchResult, erro
 	}
 
 	// 1. Find nearby airports you can drive or take a train to (between 55 and 300 miles)
+	// TODO(multi-modal-bridging): Replace raw 55-300 mile radius threshold with
+	// database.GetGroundBridgesFrom(input.End, maxTransitMins) to factor in regional rail
+	// and one-way car rental transit time/cost when unlocking open-jaw award availability.
 	distances, err := database.GetDistancesFrom(input.End)
 	if err != nil {
 		return result, err
@@ -49,6 +52,9 @@ func FindTriangleTravel(database *db.DB, input SearchInput) (*SearchResult, erro
 	}
 
 	// 2. Find direct flight destinations from the end city
+	// TODO(triangle-arbitrage): Expand single-hop route lookup into multi-leg graph search
+	// (Origin -> Hub A -> Destination -> Hub B -> Origin) via EvaluateTriangleArbitrage
+	// in internal/flights/optimizer.go.
 	routes, err := database.GetRoutesFromWithFallback(input.End, input.Alliance)
 	if err != nil {
 		return result, err
